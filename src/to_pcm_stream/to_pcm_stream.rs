@@ -1,7 +1,9 @@
-use rust_extensions::{StrOrString, TaskCompletion};
+use rust_extensions::{StrOrString, TaskCompletion, UnsafeValue};
 use tokio::sync::Mutex;
 
-use super::{ToPcmCommand, pcm_sample::PcmSample};
+use crate::{AudioCodec, PcmSample};
+
+use super::ToPcmCommand;
 
 lazy_static::lazy_static! {
      static ref TO_PCM_STREAM_TASKS: Mutex<Option<tokio::sync::mpsc::Sender<ToPcmCommand>>> = {
@@ -9,9 +11,15 @@ lazy_static::lazy_static! {
     };
 }
 
+pub struct BoxedUnsafe {
+    codec: UnsafeValue<u8>,
+    sample_rate: UnsafeValue<u32>,
+}
+
 pub struct ToPcmStream {
     last_sample_number: usize,
     temp_folder: StrOrString<'static>,
+    values: Box<BoxedUnsafe>,
 }
 
 impl ToPcmStream {
@@ -19,6 +27,11 @@ impl ToPcmStream {
         Self {
             last_sample_number: 0,
             temp_folder: "/dev/shm".into(),
+            values: BoxedUnsafe {
+                codec: UnsafeValue::new(0),
+                sample_rate: UnsafeValue::new(0),
+            }
+            .into(),
         }
     }
 
@@ -33,6 +46,20 @@ impl ToPcmStream {
 
         self.temp_folder = result.into();
         self
+    }
+
+    pub fn get_codec(&self) -> AudioCodec {
+        let value = self.values.codec.get_value();
+        AudioCodec::from_u8(value)
+    }
+
+    pub fn get_sample_rate(&self) -> Option<u32> {
+        let value = self.values.sample_rate.get_value();
+        if value == 0 {
+            return None;
+        }
+
+        Some(value)
     }
 
     pub async fn feed_source_data(&mut self, chunk: &[u8]) -> Vec<PcmSample> {
@@ -79,6 +106,14 @@ impl ToPcmStream {
 
         self.last_sample_number = result.last_sample_no;
 
+        if result.codec.is_some() {
+            self.values.codec.set_value(result.codec.to_u8());
+        }
+
+        if result.sample_rate > 0 {
+            self.values.sample_rate.set_value(result.sample_rate);
+        }
+
         result.data
     }
 }
@@ -100,6 +135,8 @@ fn execute_data(file_name: &str, last_sample_data: usize) -> FFmpegExecutionResu
         return FFmpegExecutionResult {
             data: result,
             last_sample_no: last_sample_data,
+            codec: AudioCodec::None,
+            sample_rate: 0,
         };
     }
 
@@ -116,14 +153,16 @@ fn execute_data(file_name: &str, last_sample_data: usize) -> FFmpegExecutionResu
         ffmpeg_next::codec::context::Context::from_parameters(audio_stream.parameters()).unwrap();
     let mut decoder = context.decoder().audio().unwrap();
 
-    let codec: StrOrString<'static> = match decoder.codec() {
-        Some(codec) => codec.name().to_string().into(),
-        None => "???".into(),
+    let codec = match decoder.codec() {
+        Some(codec) => codec.id().into(),
+        None => AudioCodec::None,
     };
 
-    println!("FFMPEG: Bitrate: {}", decoder.bit_rate());
-    println!("FFMPEG: SampleRate: {}", decoder.rate());
-    println!("Codec: {:?}", codec);
+    let sample_rate = decoder.rate();
+
+    //  println!("FFMPEG: Bitrate: {}", decoder.bit_rate());
+    //  println!("FFMPEG: SampleRate: {}", decoder.rate());
+    //   println!("Codec: {:?}", codec);
 
     let mut sample_no = 0;
 
@@ -155,10 +194,14 @@ fn execute_data(file_name: &str, last_sample_data: usize) -> FFmpegExecutionResu
     FFmpegExecutionResult {
         data: result,
         last_sample_no: sample_no,
+        codec,
+        sample_rate,
     }
 }
 
 pub struct FFmpegExecutionResult {
     pub data: Vec<PcmSample>,
     pub last_sample_no: usize,
+    pub codec: crate::AudioCodec,
+    pub sample_rate: u32,
 }
