@@ -115,8 +115,8 @@ fn execute_data(file_name: &str, last_sample_data: usize) -> FFmpegExecutionResu
     let context =
         ffmpeg_next::codec::context::Context::from_parameters(audio_stream.parameters()).unwrap();
     let mut decoder = context.decoder().audio().unwrap();
-
     println!("Bitrate: {}", decoder.bit_rate());
+    println!("SampleRate: {}", decoder.rate());
 
     let mut sample_no = 0;
 
