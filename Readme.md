@@ -1,6 +1,6 @@
 ### To compile the code for linux, 
 
-configure docker-compose file like this:
+configure Dockerfile file like this:
 
 ```dockerfile
 FROM ubuntu:22.04
