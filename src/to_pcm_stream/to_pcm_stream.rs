@@ -116,6 +116,8 @@ fn execute_data(file_name: &str, last_sample_data: usize) -> FFmpegExecutionResu
         ffmpeg_next::codec::context::Context::from_parameters(audio_stream.parameters()).unwrap();
     let mut decoder = context.decoder().audio().unwrap();
 
+    println!("Bitrate: {}", decoder.bit_rate());
+
     let mut sample_no = 0;
 
     for (_, packet) in ictx.packets() {
