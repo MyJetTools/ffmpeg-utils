@@ -14,3 +14,9 @@ impl PcmSample {
         (self.0.clamp(-1.0, 1.0) * 32767.0) as i16
     }
 }
+
+impl Into<PcmSample> for f32 {
+    fn into(self) -> PcmSample {
+        PcmSample(self)
+    }
+}
