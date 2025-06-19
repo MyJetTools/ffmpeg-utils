@@ -126,6 +126,12 @@ async fn to_pcm_stream_event_loop(mut rx: tokio::sync::mpsc::Receiver<ToPcmComma
     }
 }
 
+impl Default for ToPcmStream {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 fn execute_data(file_name: &str, last_sample_data: usize) -> FFmpegExecutionResult {
     let mut result = Vec::new();
 
