@@ -1,53 +1,52 @@
+use std::collections::VecDeque;
+
 use crate::PcmSample;
 
 pub struct DownSampleRate {
     down_scale: usize,
-    samples: Vec<PcmSample>,
-    pos: usize,
+    samples: VecDeque<PcmSample>,
 }
 
 impl DownSampleRate {
-    pub fn new(samples: Vec<PcmSample>, down_scale: usize) -> Self {
+    pub fn new(down_scale: usize) -> Self {
         Self {
-            samples,
-            pos: 0,
+            samples: VecDeque::new(),
             down_scale,
         }
     }
-}
 
-impl Iterator for DownSampleRate {
-    type Item = PcmSample;
+    pub fn extend(&mut self, data: Vec<PcmSample>) {
+        self.samples.extend(data);
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
-        for _ in 0..self.down_scale - 1 {
-            if self.pos >= self.samples.len() {
-                return None;
-            }
-
-            self.pos += 1;
+    pub fn extend_from_slice(&mut self, data: &[PcmSample]) {
+        for itm in data {
+            self.samples.push_back(*itm);
         }
+    }
 
-        if self.pos >= self.samples.len() {
+    pub fn next(&mut self) -> Option<PcmSample> {
+        if self.samples.len() < self.down_scale {
             return None;
         }
 
-        let result = self.samples[self.pos];
-        self.pos += 1;
+        for _ in 0..self.down_scale - 1 {
+            self.samples.pop_front();
+        }
 
-        Some(result)
+        self.samples.pop_front()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{DownSampleRate, PcmSample};
+    use crate::DownSampleRate;
 
     #[test]
     fn test_same_rate() {
-        let samples: Vec<PcmSample> = vec![0.0.into(), 0.1.into(), 0.2.into()];
+        let mut down_the_sample = DownSampleRate::new(1);
 
-        let mut down_the_sample = DownSampleRate::new(samples, 1);
+        down_the_sample.extend_from_slice(&[0.0.into(), 0.1.into(), 0.2.into()]);
 
         assert_eq!(down_the_sample.next().unwrap().as_f32_planar(), 0.0);
 
@@ -60,9 +59,8 @@ mod tests {
 
     #[test]
     fn test_down_2x() {
-        let samples: Vec<PcmSample> = vec![0.0.into(), 0.1.into(), 0.2.into(), 0.3.into()];
-
-        let mut down_the_sample = DownSampleRate::new(samples, 2);
+        let mut down_the_sample = DownSampleRate::new(2);
+        down_the_sample.extend_from_slice(&[0.0.into(), 0.1.into(), 0.2.into(), 0.3.into()]);
 
         assert_eq!(down_the_sample.next().unwrap().as_f32_planar(), 0.1);
 
@@ -73,7 +71,9 @@ mod tests {
 
     #[test]
     fn test_down_3x() {
-        let samples: Vec<PcmSample> = vec![
+        let mut down_the_sample = DownSampleRate::new(3);
+
+        down_the_sample.extend_from_slice(&[
             0.0.into(),
             0.1.into(),
             0.2.into(),
@@ -84,14 +84,28 @@ mod tests {
             0.7.into(),
             0.8.into(),
             0.9.into(),
-        ];
-
-        let mut down_the_sample = DownSampleRate::new(samples, 3);
+        ]);
 
         assert_eq!(down_the_sample.next().unwrap().as_f32_planar(), 0.2);
 
         assert_eq!(down_the_sample.next().unwrap().as_f32_planar(), 0.5);
         assert_eq!(down_the_sample.next().unwrap().as_f32_planar(), 0.8);
+
+        assert!(down_the_sample.next().is_none());
+    }
+
+    #[test]
+    fn test_down_2x_other_cases() {
+        let mut down_the_sample = DownSampleRate::new(2);
+        down_the_sample.extend_from_slice(&[0.0.into(), 0.1.into(), 0.2.into()]);
+
+        assert_eq!(down_the_sample.next().unwrap().as_f32_planar(), 0.1);
+
+        assert!(down_the_sample.next().is_none());
+
+        down_the_sample.extend_from_slice(&[0.3.into()]);
+
+        assert_eq!(down_the_sample.next().unwrap().as_f32_planar(), 0.3);
 
         assert!(down_the_sample.next().is_none());
     }
