@@ -174,7 +174,7 @@ impl VoiceDetector {
         self.detect_silence();
     }
 
-    pub fn try_get_last_frame(self) -> Option<Vec<PcmSample>> {
+    pub fn try_get_last_chunk(self) -> Option<Vec<PcmSample>> {
         match self.mode {
             DetectionModel::Silence(_) => {
                 return None;
