@@ -1,16 +1,18 @@
 use std::collections::VecDeque;
 
+use rust_extensions::date_time::DateTimeAsMicroseconds;
+
 use crate::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum DetectionModel {
-    Silence,
+    Silence(DateTimeAsMicroseconds),
     VoiceStarted { silence_detected: Option<usize> },
 }
 
 impl Default for DetectionModel {
     fn default() -> Self {
-        Self::Silence
+        Self::Silence(DateTimeAsMicroseconds::now())
     }
 }
 
@@ -41,10 +43,10 @@ impl VoiceDetector {
         }
     }
 
-    pub fn is_silence(&self) -> bool {
+    pub fn is_silence(&self) -> Option<DateTimeAsMicroseconds> {
         match self.mode {
-            DetectionModel::Silence => true,
-            _ => false,
+            DetectionModel::Silence(time) => Some(time),
+            _ => None,
         }
     }
 
@@ -98,7 +100,7 @@ impl VoiceDetector {
             let is_silence = is_silence(chunk_20_ms, self.silence_threshold);
 
             match self.mode {
-                DetectionModel::Silence => {
+                DetectionModel::Silence(_) => {
                     if is_silence {
                         self.delete_first_chunk_of_silence(end_of_chunk);
                         continue;
