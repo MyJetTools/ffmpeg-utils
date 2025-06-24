@@ -173,6 +173,15 @@ impl VoiceDetector {
         self.current_stream.extend_from_slice(samples);
         self.detect_silence();
     }
+
+    pub fn try_get_last_frame(self) -> Option<Vec<PcmSample>> {
+        match self.mode {
+            DetectionModel::Silence(_) => {
+                return None;
+            }
+            DetectionModel::VoiceStarted { .. } => Some(self.current_stream),
+        }
+    }
 }
 
 fn is_silence(chunk: &[PcmSample], threshold: f32) -> bool {
