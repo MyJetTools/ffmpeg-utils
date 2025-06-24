@@ -41,6 +41,13 @@ impl VoiceDetector {
         }
     }
 
+    pub fn is_silence(&self) -> bool {
+        match self.mode {
+            DetectionModel::Silence => true,
+            _ => false,
+        }
+    }
+
     pub fn get_sample_rate(&self) -> u32 {
         self.sample_rate
     }
