@@ -16,6 +16,15 @@ impl Default for DetectionModel {
     }
 }
 
+impl DetectionModel {
+    pub fn is_silence(&self) -> bool {
+        match self {
+            Self::Silence(_) => true,
+            _ => false,
+        }
+    }
+}
+
 pub struct VoiceDetector {
     sample_rate: u32,
     samples_amount_20ms: usize,
@@ -76,15 +85,21 @@ impl VoiceDetector {
 
         self.out_put.push_back(new_item);
         self.pos = 0;
-        self.mode = Default::default();
         self.prev_chunk = None;
+
+        if !self.mode.is_silence() {
+            self.mode = Default::default()
+        }
     }
 
     fn delete_first_chunk_of_silence(&mut self, to: usize) {
         let chunk: Vec<_> = self.current_stream.drain(..to).collect();
         self.prev_chunk = Some(chunk);
         self.pos = 0;
-        self.mode = Default::default()
+
+        if !self.mode.is_silence() {
+            self.mode = Default::default()
+        }
     }
 
     fn detect_silence(&mut self) {
